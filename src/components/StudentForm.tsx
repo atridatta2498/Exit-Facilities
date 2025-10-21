@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import FeedbackQuestions from './FeedbackQuestions';
 import StatusMessage from './StatusMessage';
-import OTPVerification from './OTPVerification';
 import {
   FormContainer,
   Title,
@@ -72,8 +71,6 @@ const StudentForm: React.FC = () => {
     message: string;
     isVisible: boolean;
   }>({ type: 'success', message: '', isVisible: false });
-  const [showOTPVerification, setShowOTPVerification] = useState(false);
-  const [isEmailVerified, setIsEmailVerified] = useState(false);
 
   const validateForm = () => {
     const newErrors: FormErrors = {};
@@ -158,11 +155,6 @@ const StudentForm: React.FC = () => {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (validateForm()) {
-      if (!isEmailVerified) {
-        setShowOTPVerification(true);
-        return;
-      }
-      
       // Check if this roll already submitted
       (async () => {
         try {
@@ -449,17 +441,7 @@ const StudentForm: React.FC = () => {
           onSubmit={handleFeedbackSubmit}
         />
       )}
-      {showOTPVerification && (
-        <OTPVerification
-          email={formData.email}
-          onVerificationComplete={() => {
-            setShowOTPVerification(false);
-            setIsEmailVerified(true);
-            setShowFeedback(true);
-          }}
-          onCancel={() => setShowOTPVerification(false)}
-        />
-      )}
+
       <StatusMessage
         type={notification.type}
         message={notification.message}

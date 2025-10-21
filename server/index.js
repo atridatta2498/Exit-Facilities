@@ -3,30 +3,8 @@ const cors = require('cors');
 const pool = require('./db');
 const bodyParser = require('body-parser');
 const path = require('path');
-const nodemailer = require('nodemailer');
 
-// Create nodemailer transporter
 require('dotenv').config();
-
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-});
-
-// Verify SMTP connection on startup to surface auth/connectivity issues early
-transporter.verify((err, success) => {
-  if (err) {
-    console.error('SMTP verification failed. Check EMAIL_USER / EMAIL_PASSWORD and network access to smtp.gmail.com:587');
-    console.error(err && err.message ? err.message : err);
-  } else {
-    console.log('SMTP transporter verified. Ready to send emails');
-  }
-});
 
 let PDFDocument;
 try {
@@ -39,117 +17,6 @@ try {
 const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: '1mb' }));
-
-// Store OTPs temporarily
-const otpStore = new Map();
-
-// Email validation function
-function isValidEmail(email) {
-  const pattern = /^\d{2}[a-zA-Z]\d{2}[a-zA-Z]\d{4}@sves\.org\.in$/;
-  return pattern.test(email);
-}
-
-// Generate OTP
-function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// Send OTP route
-app.post('/api/send-otp', async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    // Validate email format
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ 
-        error: 'invalid_email', 
-        message: 'Please enter your college email address (e.g., 21U21A0500@sves.org.in)' 
-      });
-    }
-
-    const otp = generateOTP();
-    
-    // Store OTP with timestamp
-    otpStore.set(email, {
-      otp,
-      timestamp: Date.now(),
-      attempts: 0
-    });
-
-    // Send email
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Your OTP for eFacilities Feedback Form',
-      text: `Your OTP is: ${otp}. This code will expire in 5 minutes.`,
-      html: `
-        <h2>eFacilities Feedback Form Verification</h2>
-        <p>Your OTP is: <strong>${otp}</strong></p>
-        <p>This code will expire in 5 minutes.</p>
-        <p>If you didn't request this code, please ignore this email.</p>
-      `
-    });
-
-    res.json({ success: true, message: 'OTP sent successfully' });
-  } catch (error) {
-    console.error('Send OTP error:', error);
-    res.status(500).json({ error: 'failed_to_send_otp' });
-  }
-});
-
-// Verify OTP route
-app.post('/api/verify-otp', async (req, res) => {
-  try {
-    const { email, otp } = req.body;
-
-    const storedData = otpStore.get(email);
-    
-    // Check if OTP exists
-    if (!storedData) {
-      return res.status(400).json({ 
-        error: 'invalid_otp',
-        message: 'OTP not found or expired. Please request a new one.' 
-      });
-    }
-
-    // Check OTP expiry (5 minutes)
-    if (Date.now() - storedData.timestamp > 5 * 60 * 1000) {
-      otpStore.delete(email);
-      return res.status(400).json({ 
-        error: 'expired_otp',
-        message: 'OTP has expired. Please request a new one.' 
-      });
-    }
-
-    // Increment attempt counter
-    storedData.attempts++;
-
-    // Check max attempts (3)
-    if (storedData.attempts >= 3) {
-      otpStore.delete(email);
-      return res.status(400).json({ 
-        error: 'max_attempts',
-        message: 'Too many attempts. Please request a new OTP.' 
-      });
-    }
-
-    // Verify OTP
-    if (storedData.otp !== otp) {
-      return res.status(400).json({ 
-        error: 'invalid_otp',
-        message: 'Invalid OTP. Please try again.' 
-      });
-    }
-
-    // OTP verified successfully
-    otpStore.delete(email);
-    res.json({ success: true, message: 'Email verified successfully' });
-
-  } catch (error) {
-    console.error('Verify OTP error:', error);
-    res.status(500).json({ error: 'verification_failed' });
-  }
-});
 
 app.post('/api/feedback', async (req, res) => {
   try {
