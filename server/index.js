@@ -10,11 +10,21 @@ require('dotenv').config();
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD
+  }
+});
+
+// Verify SMTP connection on startup to surface auth/connectivity issues early
+transporter.verify((err, success) => {
+  if (err) {
+    console.error('SMTP verification failed. Check EMAIL_USER / EMAIL_PASSWORD and network access to smtp.gmail.com:587');
+    console.error(err && err.message ? err.message : err);
+  } else {
+    console.log('SMTP transporter verified. Ready to send emails');
   }
 });
 
